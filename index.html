@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f7c86">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ピント範囲">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
+<title>ピント範囲シミュレーター</title>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#eef1f3;--panel:#fff;--ink:#17212b;--sub:#5b6b78;--line:#d5dce1;--acc:#0f7c86;--hi:#f0a020;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#10181f;--panel:#1a252e;--ink:#eef2f5;--sub:#9fb0bd;--line:#2c3b46;--acc:#4fc3cc;--hi:#f5b13d}}
+:root[data-theme="dark"]{--bg:#10181f;--panel:#1a252e;--ink:#eef2f5;--sub:#9fb0bd;--line:#2c3b46;--acc:#4fc3cc;--hi:#f5b13d}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic",sans-serif;line-height:1.6}
+main{max-width:640px;margin:0 auto;padding:16px}
+h1{font-size:20px;margin:4px 0 12px;font-weight:900}
+.view{border-radius:14px;overflow:hidden;background:#000;aspect-ratio:16/10}
+.view{position:relative}
+.band{position:absolute;inset:0;background:var(--img) center/cover no-repeat}
+.fz,.sm{position:absolute;left:0;right:0;z-index:2;pointer-events:none}
+.fz{background:rgba(240,160,32,.25);border-top:2px solid var(--hi);border-bottom:2px solid var(--hi)}
+.fz span{position:absolute;right:8px;top:4px;background:var(--hi);color:#111;font-weight:900;font-size:13px;padding:2px 8px;border-radius:6px}
+.sm{height:0;border-top:2px dashed #fff}
+.sm span{position:absolute;left:8px;top:3px;background:rgba(0,0,0,.6);color:#fff;font-size:12px;padding:1px 8px;border-radius:6px}
+.pick{display:block;text-align:center;margin:10px 0 0;padding:12px;border-radius:12px;background:var(--acc);color:#fff;font-weight:700;cursor:pointer}
+.result{background:var(--panel);border-radius:14px;padding:16px;margin:12px 0}
+.big{font-size:26px;font-weight:900;line-height:1.3}
+.big small{font-size:14px;font-weight:400;color:var(--sub)}
+.note{color:var(--sub);font-size:13px;margin:6px 0 0}
+.bar{position:relative;height:34px;background:var(--line);border-radius:8px;margin:14px 0 4px;overflow:hidden}
+.zone{position:absolute;top:0;bottom:0;background:var(--hi);min-width:3px}
+.cam{position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--acc)}
+.subj{position:absolute;top:4px;bottom:4px;width:3px;background:var(--ink)}
+.scale{display:flex;justify-content:space-between;font-size:12px;color:var(--sub)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--sub);margin-top:6px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+.ctl{background:var(--panel);border-radius:14px;padding:6px 16px 12px}
+.row{padding:10px 0;border-bottom:1px solid var(--line)}
+.row:last-child{border:0}
+.top{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.top b{font-size:15px}
+.val{font-weight:900;color:var(--acc);font-size:17px}
+.hint{font-size:12px;color:var(--sub)}
+input[type=range]{width:100%;height:32px;accent-color:var(--acc)}
+select{width:100%;font:inherit;padding:10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink)}
+.presets{display:flex;gap:8px;overflow-x:auto;padding:4px 0 12px}
+.presets button{flex:none;font:inherit;font-weight:700;padding:10px 14px;border-radius:999px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer}
+.presets button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+.presets button:active{background:var(--acc);color:#fff}
+</style>
+</head>
+<body>
+<main>
+<h1>ピント範囲シミュレーター</h1>
+
+<div class="view" id="view"><div id="fz" class="fz"><span id="fzl"></span></div><div id="sm" class="sm"><span id="sml"></span></div></div>
+<label class="pick"><input type="file" id="file" accept="image/*" hidden>📷 自分の写真を選ぶ</label>
+<p class="note">下が手前、上が奥になる写真(道・机・地面が写るもの)がぴったりです。黄色い帯がピントの合う幅です。</p>
+
+<div class="result" aria-live="polite">
+<div class="big" id="range">--</div>
+<p class="note" id="msg"></p>
+<svg viewBox="0 0 320 120" style="width:100%;display:block;margin-top:10px" role="img" aria-label="横から見た図">
+<line x1="6" y1="92" x2="314" y2="92" style="stroke:var(--sub)" stroke-width="1.5"/>
+<rect id="zr" y="26" height="66" rx="3" style="fill:var(--hi)" opacity=".35"/>
+<line id="zn" y1="22" y2="92" style="stroke:var(--hi)" stroke-width="2"/><line id="zf" y1="22" y2="92" style="stroke:var(--hi)" stroke-width="2"/>
+<g id="cam" style="fill:var(--acc)"><rect x="8" y="66" width="22" height="16" rx="3"/><rect x="30" y="70" width="9" height="8" rx="1"/></g>
+<text x="8" y="106" font-size="9" style="fill:var(--sub)">カメラ</text>
+<g id="pp" style="fill:var(--ink)"><circle cx="0" cy="56" r="7"/><path d="M-9 92 C-9 70 -5 64 0 64 C5 64 9 70 9 92Z"/></g>
+<text id="wl" y="14" font-size="11" font-weight="700" text-anchor="middle" style="fill:var(--ink)"></text>
+<text id="nl" y="106" font-size="9" text-anchor="end" style="fill:var(--sub)"></text>
+<text id="fl" y="106" font-size="9" style="fill:var(--sub)"></text>
+</svg>
+<p class="note" id="far" style="text-align:right"></p>
+<div class="legend"><span><i style="background:var(--hi)"></i>ピントが合う範囲</span><span><i style="background:var(--ink)"></i>被写体(横から見た図)</span></div>
+</div>
+
+<div class="presets" role="group" aria-label="かんたん設定">
+<button data-p="85,1.8,2,6,1">人物(背景ぼかし)</button>
+<button data-p="24,11,5,20,1">風景(全部くっきり)</button>
+<button data-p="50,4,0.6,3,1">小物・料理</button>
+<button data-p="26,1.8,1,5,5">スマホ</button>
+</div>
+
+<div class="ctl">
+<div class="row"><div class="top"><b>ズーム(レンズの長さ)</b><span class="val" id="vf"></span></div>
+<input type="range" id="f" min="14" max="200" step="1" value="50" aria-label="ズーム">
+<div class="hint">数字が大きいほど遠くが大きく写り、背景がぼけやすい</div></div>
+
+<div class="row"><div class="top"><b>絞り(F値)</b><span class="val" id="vn"></span></div>
+<input type="range" id="n" min="0" max="100" step="1" value="30" aria-label="絞り">
+<div class="hint">数字が小さいほど、ピントが合う範囲がせまくなる</div></div>
+
+<div class="row"><div class="top"><b>被写体までの距離</b><span class="val" id="vs"></span></div>
+<input type="range" id="s" min="0" max="100" step="1" value="40" aria-label="被写体までの距離">
+<div class="hint">近づくほど、ピントが合う範囲がせまくなる</div></div>
+
+<div class="row"><div class="top"><b>背景は被写体の何m後ろ?</b><span class="val" id="vb"></span></div>
+<input type="range" id="b" min="0" max="100" step="1" value="50" aria-label="背景までの距離">
+<div class="hint">離れるほど、背景がぼける</div></div>
+
+<div class="row"><b>カメラの種類</b><div style="height:6px"></div>
+<select id="c" aria-label="カメラの種類">
+<option value="1">フルサイズ(ミラーレス・一眼)</option>
+<option value="1.5">APS-C(小さめの一眼)</option>
+<option value="2">マイクロフォーサーズ</option>
+<option value="5">スマホ</option>
+</select></div>
+</div>
+</main>
+
+<script>
+const $=id=>document.getElementById(id);
+const stops=[1.2,1.4,1.8,2,2.8,3.5,4,5.6,8,11,16];
+const mapN=v=>{const p=v/100*(stops.length-1),i=Math.floor(p),r=p-i;return i>=stops.length-1?stops[stops.length-1]:stops[i]*Math.pow(stops[i+1]/stops[i],r)};
+const mapS=v=>0.3*Math.pow(20/0.3,v/100);
+const mapB=v=>0.5*Math.pow(60,v/100);
+const fmt=m=>m>=10?m.toFixed(0)+"m":m>=1?m.toFixed(1)+"m":Math.round(m*100)+"cm";
+const invN=x=>{let best=0,d=1e9;for(let i=0;i<=100;i++){const e=Math.abs(mapN(i)-x);if(e<d){d=e;best=i}}return best};
+const invS=x=>Math.round(Math.log(x/0.3)/Math.log(20/0.3)*100);
+const invB=x=>Math.round(Math.log(x/0.5)/Math.log(60)*100);
+
+const H0=0.3,TS=0.72,B=16;
+const view=$("view"),bands=[];
+for(let i=0;i<B;i++){const e=document.createElement("div");e.className="band";
+  e.style.clipPath="inset("+(i/B*100)+"% 0 "+(100-(i+1)/B*100-0.3)+"% 0)";view.insertBefore(e,view.firstChild);bands.push(e);}
+$("b").closest(".row").style.display="none";
+function setImg(u){view.style.setProperty("--img","url("+u+")");}
+(function sample(){const c=document.createElement("canvas");c.width=640;c.height=400;const g=c.getContext("2d");
+  const sk=g.createLinearGradient(0,0,0,120);sk.addColorStop(0,"#7fa8d0");sk.addColorStop(1,"#dfe8ee");g.fillStyle=sk;g.fillRect(0,0,640,130);
+  g.fillStyle="#6f7f5a";g.fillRect(0,120,640,280);
+  [1.3,1.6,2,2.5,3.2,4.5,6,9,14,25].forEach((d,i)=>{const t=H0+(TS-H0)*2/d,y=Math.min(1,t)*400;
+    g.fillStyle="rgba(255,255,255,.8)";g.fillRect(0,y,640,2+2*(1-i/10));
+    const sz=Math.max(6,60/d*1.6),x=i%2?470:170;g.fillStyle=i%2?"#c8483f":"#2f5f8f";g.fillRect(x,y-sz*2,sz*.9,sz*2);});
+  g.fillStyle="#fff";g.font="bold 16px sans-serif";g.fillText("サンプル:上の「自分の写真を選ぶ」で入れ替えできます",14,385);
+  c.toBlob(b=>{if(!view.style.getPropertyValue("--img")){setImg(URL.createObjectURL(b));}});})();
+$("file").addEventListener("change",e=>{const f=e.target.files[0];if(f)setImg(URL.createObjectURL(f));});
+function update(){
+  const f=+$("f").value,N=mapN(+$("n").value),s=mapS(+$("s").value),bd=mapB(+$("b").value),crop=+$("c").value;
+  $("vf").textContent=f+"mm";$("vn").textContent="F"+N.toFixed(1);
+  $("vs").textContent=fmt(s);$("vb").textContent=fmt(bd);
+  const c=0.03/crop, sm=s*1000;
+  const H=f*f/(N*c)+f;
+  const near=sm*(H-f)/(H+sm-2*f);
+  const far=sm<H?sm*(H-f)/(H-sm):Infinity;
+  const nearM=near/1000,farM=far/1000;
+  const inf=!isFinite(farM);
+  $("range").innerHTML=fmt(nearM)+" 〜 "+(inf?"ずっと奥まで":fmt(farM))+(inf?"":" <small>(幅 "+fmt(farM-nearM)+")</small>");
+  const w=inf?Infinity:farM-nearM;
+  $("msg").textContent=inf||w>s?"ほぼ全体にピントが合います。風景向きです。":w<0.15?"ピントが合う範囲がとてもせまい設定です。目など1点をしっかり狙いましょう。":w<0.6?"人物が1人写る程度。背景はふんわりぼけます。":"手前から奥までかなり広くピントが合います。";
+  // 横から見た図
+  const maxD=Math.min(Math.max(s*1.6,inf?0:farM*1.2),300),X0=40,X1=306;
+  const X=d=>X0+Math.min(1,d/maxD)*(X1-X0);
+  const xn=X(nearM),xf=inf?X1:Math.max(X(farM),xn+3);
+  const set=(id,o)=>{for(const k in o)$(id).setAttribute(k,o[k]);};
+  set("zr",{x:xn,width:xf-xn});set("zn",{x1:xn,x2:xn});set("zf",{x1:xf,x2:xf});
+  set("pp",{transform:"translate("+X(s)+" 0)"});
+  const mid=Math.min(280,Math.max(50,(xn+xf)/2));
+  set("wl",{x:mid});$("wl").textContent=inf?"奥まで全部ピントOK":"ピントの幅 "+fmt(farM-nearM);
+  set("nl",{x:Math.max(30,xn-2)});$("nl").textContent="手前 "+fmt(nearM);
+  set("fl",{x:Math.min(250,xf+2)});$("fl").textContent=inf?"":"奥 "+fmt(farM);
+  $("far").textContent="図の右はしはカメラから "+fmt(maxD);
+  const sw=36/crop, vw=$("view").clientWidth, dS=s*1000, K=f*f/(N*(dS-f));
+  const dAt=t=>t<=H0+0.02?300:s*(TS-H0)/(t-H0);
+  bands.forEach((el,i)=>{const d=dAt((i+.5)/B)*1000;
+    const px=Math.min(30,K*Math.abs(d-dS)/d/sw*vw*1.5);
+    el.style.filter=px>0.4?"blur("+px.toFixed(1)+"px)":"none";});
+  const tOf=d=>Math.min(1,Math.max(0,H0+s*(TS-H0)/d));
+  const tn=tOf(nearM),tf=inf?0:tOf(farM);
+  $("fz").style.top=(tf*100)+"%";$("fz").style.height=((tn-tf)*100)+"%";
+  $("fzl").textContent=inf?"奥まで全部ピントOK":"ピントが合う幅 "+fmt(farM-nearM);
+  $("sm").style.top=(TS*100)+"%";$("sml").textContent="被写体 "+fmt(s);
+}
+["f","n","s","b","c"].forEach(i=>$(i).addEventListener("input",update));
+document.querySelectorAll(".presets button").forEach(bt=>bt.onclick=()=>{
+  const [f,n,s,b,c]=bt.dataset.p.split(",").map(Number);
+  $("f").value=f;$("n").value=invN(n);$("s").value=invS(s);$("b").value=invB(b);$("c").value=String(c);
+  update();
+});
+update();
+if("serviceWorker"in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+</script>
+</body>
+</html>
